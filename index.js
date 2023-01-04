@@ -6,6 +6,7 @@ const shorturl = require("./models/shortUrl");
 const app = express();
 var bodyParser = require("body-parser");
 const shortUrl = require("./models/shortUrl");
+const dns = require("dns");
 
 mongoose.connect(process.env.MONGO_URI, {
 	useNewUrlParser: true,
@@ -14,7 +15,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 const isValidUrl = (urlString) => {
 	try {
-		return Boolean(new URL("https://www.jsowl.com"));
+		return Boolean(new URL(urlString));
 	} catch (e) {
 		return false;
 	}
@@ -39,20 +40,36 @@ app.get("/api/hello", function (req, res) {
 	res.json({ greeting: "hello API" });
 });
 
+const links = [];
+let id = 0;
+
 app.post("/api/shorturl", async (req, res) => {
-	const { url } = req.body;
+	let url = req.body["url"];
 
-	console.log("URL: " + url.replace(/\\/g, ""));
+	url = url.replace(/^https?:\/\/\//, "");
 
-	if (isValidUrl(url) == false) {
-		return res.json({ error: "invalid url" });
-	}
+	console.log(url, isValidUrl(url));
+
+	dns.lookup(url, (err, addresses, family) => {
+		if (err) {
+			return res.json({ error: "invalid url" });
+		}
+		id++;
+		links.push({
+			id,
+			url,
+		});
+	});
 
 	let urlData = await shortUrl.create({ full: url });
 
-	urlData = urlData.toJSON();
+	// urlData = urlData.toJSON();
 
 	return res.json({ original_url: url, short_url: urlData.short });
+});
+
+app.get("api/shorturl/:id", (req, res) => {
+	const { id } = req.query;
 });
 
 app.listen(port, function () {
