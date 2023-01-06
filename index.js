@@ -54,9 +54,7 @@ app.post("/api/shorturl", async (req, res) => {
 	let options = { upsert: true, new: true, setDefaultsOnInsert: true };
 	let urlData = await shortUrl.findOneAndUpdate(query, update, options);
 
-	console.log("UPDATE ", urlData);
-
-	return res.json(urlData);
+	return res.json({ original_url: urlData.full, short_url: urlData.short });
 });
 
 app.get("/api/shorturl/:url", async (req, res) => {
@@ -65,8 +63,6 @@ app.get("/api/shorturl/:url", async (req, res) => {
 	console.log("URL", url);
 
 	const urlObj = await shortUrl.find({ short: url });
-
-	console.log("URL OBJ", JSON.stringify(urlObj[0]));
 
 	res.redirect(urlObj[0].full);
 });
