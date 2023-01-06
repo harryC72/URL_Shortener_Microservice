@@ -7,19 +7,12 @@ const app = express();
 var bodyParser = require("body-parser");
 const shortUrl = require("./models/shortUrl");
 const dns = require("dns");
+var parse = require("url-parse");
 
 mongoose.connect(process.env.MONGO_URI, {
 	useNewUrlParser: true,
 	useUnifiedTopology: true,
 });
-
-const isValidUrl = (urlString) => {
-	try {
-		return Boolean(new URL(urlString));
-	} catch (e) {
-		return false;
-	}
-};
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
@@ -41,35 +34,41 @@ app.get("/api/hello", function (req, res) {
 });
 
 const links = [];
-let id = 0;
 
 app.post("/api/shorturl", async (req, res) => {
 	let url = req.body["url"];
 
-	url = url.replace(/^https?:\/\/\//, "");
+	const parsedUrl = parse(url, true).hostname;
 
-	console.log(url, isValidUrl(url));
+	console.log("PARSED URL", parsedUrl);
 
-	dns.lookup(url, (err, addresses, family) => {
+	await dns.lookup(parsedUrl, (err, address, family) => {
+		console.log("FROM LOOK UP", address, family);
 		if (err) {
 			return res.json({ error: "invalid url" });
 		}
-		id++;
-		links.push({
-			id,
-			url,
-		});
 	});
 
-	let urlData = await shortUrl.create({ full: url });
+	let query = { full: url };
+	let update = { full: url };
+	let options = { upsert: true, new: true, setDefaultsOnInsert: true };
+	let urlData = await shortUrl.findOneAndUpdate(query, update, options);
 
-	// urlData = urlData.toJSON();
+	console.log("UPDATE ", urlData);
 
-	return res.json({ original_url: url, short_url: urlData.short });
+	return res.json(urlData);
 });
 
-app.get("api/shorturl/:id", (req, res) => {
-	const { id } = req.query;
+app.get("/api/shorturl/:url", async (req, res) => {
+	const { url } = req.params;
+
+	console.log("URL", url);
+
+	const urlObj = await shortUrl.find({ short: url });
+
+	console.log("URL OBJ", JSON.stringify(urlObj[0]));
+
+	res.redirect(urlObj[0].full);
 });
 
 app.listen(port, function () {
